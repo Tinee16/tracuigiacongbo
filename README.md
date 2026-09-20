@@ -1,40 +1,38 @@
-# Project: Tra cứu giá công bố
+# Hướng B: collector an toàn hơn
 
-Python project to search the DAV public portal for records tied to the declared unit "Vinphaco / Công ty cổ phần dược phẩm Vĩnh Phúc" and export matching results to Excel.
+Project đã được tổ chức lại thành package `dav_scraper` và bổ sung:
 
-## Features
-- Search by multiple equivalent keywords and aliases
-- Normalizes variants with/without accents, spacing, underscores, punctuation, and uppercase/lowercase differences
-- Supports multi-page crawling with delays and retry logic
-- Exports results to `.xlsx`
-- Writes a simple JSON summary report
+- Chuẩn hóa Unicode NFKC/NFD, bỏ dấu tiếng Việt, xử lý `_`, `-`, dấu câu, viết hoa/thường và khoảng trắng.
+- Mở rộng viết tắt phổ biến: `CTCP`, `Cty`, `CP`, `DP`.
+- So khớp cả tên pháp lý, thương hiệu và chuỗi không có khoảng trắng.
+- Retry có backoff cho lỗi máy chủ 5xx; timeout rõ ràng.
+- Delay ngẫu nhiên trong khoảng cấu hình giữa các request, chỉ một session ổn định.
+- Dừng an toàn khi nhận 401/403/429 hoặc phát hiện CAPTCHA/Cloudflare/access-denied; không xoay IP, không vượt CAPTCHA, không gửi request dồn dập.
+- Phát hiện liên kết phân trang bằng `href`, `rel`, `aria-label`, sau đó mới dùng fallback `?page=`.
+- Deduplicate bản ghi và lưu được các cột gốc dạng `column_1`, `column_2`, ... cùng `row_text`.
+- Ghi `summary.json` với trạng thái `success`, `no_records_found`, `blocked` hoặc `network_error`.
 
-## Setup
+## Chạy
 
 ```bash
 python -m venv .venv
-source .venv/bin/activate  # Windows: .venv\Scripts\activate
+# macOS/Linux
+source .venv/bin/activate
+# Windows: .venv\\Scripts\\activate
 pip install -r requirements.txt
+python main.py --output output/vinphaco_results.xlsx
 ```
 
-## Run
+Điều chỉnh nhịp truy cập:
 
 ```bash
-python main.py \
-  --keywords "Vinphaco" "Công ty cổ phần dược phẩm Vĩnh Phúc" \
-  --output output/vinphaco_results.xlsx
+python main.py --min-delay 3 --max-delay 8 --retries 3 --max-pages 100
 ```
 
-Or use the default built-in aliases:
+Kiểm thử bộ so khớp:
 
 ```bash
-python main.py
+pytest -q
 ```
 
-## Output
-- Excel file in `output/`
-- Summary JSON file in `output/`
-- Console log with record count and completion status
-
-## Important note
-This tool is designed for publicly accessible information and respects normal site usage. It includes retries, rate limiting, and consistent session headers to reduce the chance of being blocked. If the target site enforces CAPTCHA or bot protection, the script will stop gracefully and report the issue.
+Nếu portal yêu cầu CAPTCHA hoặc đăng nhập, hãy giải quyết thủ công theo quy định của website rồi chạy lại; chương trình cố ý dừng thay vì tìm cách vượt cơ chế bảo vệ.
